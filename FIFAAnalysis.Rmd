@@ -1,0 +1,431 @@
+---
+title: "Group Project"
+author: "Tyler Ward"
+date: "July 3, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=F}
+library(tidyverse)
+library(dplyr)
+library(hexbin)
+library(broom)
+```
+
+
+
+```{r}
+library(readr)
+
+FIFA_19 <- read_csv("~/STOR 320/FIFA 19.csv")
+
+
+
+
+fifa = read_csv("~/STOR 320/FinalFifa.csv")
+
+
+```
+
+```{r}
+fifaNoGK = fifa %>% filter(Position != "GK") %>% select(-c(GKDiving, GKHandling, GKKicking, GKPositioning, GKReflexes, Value, Wage, Weight, Name, Joined, Contract.Valid.Until,Release.Clause, Height, Unit, UnitRelease, UnitHeight, Inches, Work.Rate)) 
+
+
+set.seed(350)
+fifaNoGK$SPLIT = sample(x=c("TRAIN", "TEST"), size = 16122, replace = T, prob = c(.85, .15))
+
+TRAIN = fifaNoGK %>% filter(SPLIT == "TRAIN")
+TEST = fifaNoGK %>% filter(SPLIT == "TEST")
+
+
+
+```
+
+
+
+```{r}
+TRAIN = TRAIN %>% select(-c( SPLIT, Club, Nationality))
+TRAIN2 = fifaNoGK %>% filter(SPLIT == "TRAIN") %>% select(-c(SPLIT))
+TEST2 = fifaNoGK %>% filter(SPLIT == "TEST") %>% select(-c(SPLIT))
+LM2 = lm(Value2 ~ ., data = TRAIN2)
+summary(LM2)
+```
+
+```{r}
+LM3 = lm(Value2 ~ Age + Overall + Potential + International.Reputation + Crossing + Finishing + HeadingAccuracy + ShortPassing + Volleys + LongPassing + BallControl + Reactions +  Stamina + Vision + Marking + StandingTackle + Wage2 + ReleaseClause2, data = TRAIN2)
+summary(LM3)
+
+```
+```{r}
+valueNoGK = lm(Value2~ Age + Overall + Potential + International.Reputation + Crossing + Finishing + HeadingAccuracy + ShortPassing + Volleys + LongPassing + BallControl + Reactions +  Stamina + Vision + StandingTackle + Wage2 + ReleaseClause2, data = TRAIN2)
+summary(valueNoGK)
+
+plot(valueNoGK$residuals ~ valueNoGK$fitted.values)
+abline(0,0)
+```
+
+```{r}
+
+
+
+fifaNoGK %>% mutate(predict.value=predict(LM3,fifaNoGK)) %>%
+
+  ggplot()+geom_point(aes(x=Value2,y=predict.value,
+
+              color=factor(SPLIT,levels=c("TRAIN","TEST"))),alpha=0.2) + 
+
+  theme_minimal() + geom_abline(intercept=0,slope=1) +
+
+  guides(color=guide_legend(title="Dataset")) + xlab("Value") +
+
+  ylab("Predicted Value Under MODEL 2")
+
+
+fifaNoGK %>% mutate(predict.value=predict(valueNoGK,fifaNoGK)) %>%
+
+  ggplot()+geom_point(aes(x=Value2,y=predict.value,
+
+              color=factor(SPLIT,levels=c("TRAIN","TEST"))),alpha=0.2) + 
+
+  theme_minimal() + geom_abline(intercept=0,slope=1) +
+
+  guides(color=guide_legend(title="Dataset")) + xlab("Value") +
+
+  ylab("Predicted Value Under MODEL 2")
+```
+```{r}
+
+
+fifaNoGK %>% mutate(predict.value=predict(LM3,fifaNoGK)) %>%
+
+  ggplot()+geom_point(aes(x=Value2,y=predict.value), color = "red", alpha =.2) + 
+
+  theme_minimal() + geom_abline(intercept=0,slope=1) +
+
+   xlab("Value") +
+
+  ylab("Predicted Value Under MODEL 2") + ggtitle("Predicted Value Fitted on Test Data")
+
+
+fifaNoGK %>% mutate(predict.value=predict(valueNoGK,fifaNoGK)) %>%
+
+  ggplot()+geom_point(aes(x=Value2,y=predict.value), color = "red", alpha =.2) + 
+
+  theme_minimal() + geom_abline(intercept=0,slope=1) +
+
+   xlab("Value") +
+
+  ylab("Predicted Value Under MODEL 2") + ggtitle("Predicted Value Fitted on Test Data")
+```
+
+
+```{r}
+RMSE.func = function(actual,predict){
+mse=mean((actual-predict)^2,na.rm=T)
+rmse=sqrt(mse)
+return(rmse)
+}
+
+RMSE.func(actual= fifaNoGK$Value2, predict=predict(LM3, fifaNoGK))
+RMSE.func(actual=fifaNoGK$Value2, predict=predict(valueNoGK, fifaNoGK))
+
+
+plot(LM3$residuals ~ LM3$fitted.values)
+abline(0,0)
+
+```
+
+
+
+```{r}
+LM4 = lm(Overall ~ ., data = TRAIN2)
+summary(LM4)
+```
+
+```{r}
+LM5 = lm(Overall ~ Age + Potential +  International.Reputation +  Finishing + HeadingAccuracy + ShortPassing + Dribbling + Curve + LongPassing + BallControl + Acceleration + SprintSpeed + Agility + Reactions + Stamina +Strength + Positioning + Vision + Penalties + Composure + Marking + StandingTackle  + SlidingTackle + Value2 + Weight2 + ReleaseClause2, data = TRAIN2)
+summary(LM5)
+
+plot(LM5$residuals ~ LM5$fitted.values)
+abline(0,0)
+
+
+
+
+logLM5 = lm(log(Overall) ~ Age + Potential +  International.Reputation +  Finishing + HeadingAccuracy + ShortPassing + Dribbling + Curve + LongPassing + BallControl + Acceleration + SprintSpeed + Agility + Reactions + Stamina +Strength + Positioning + Vision + Penalties + Composure + Marking + StandingTackle  + SlidingTackle + Value2 + Weight2 + ReleaseClause2, data = TRAIN2)
+summary(logLM5)
+
+plot(logLM5$residuals ~ logLM5$fitted.values)
+abline(0,0)
+
+RMSE.func(actual=fifaNoGK$Overall,
+predict=predict(LM5, fifaNoGK))
+
+
+RMSE.func(actual= fifaNoGK$Overall, predict = exp(predict(logLM5, fifaNoGK)))
+```
+
+```{r}
+overallNoGK = lm(Overall ~ Age + Potential +  International.Reputation +  Finishing + HeadingAccuracy + ShortPassing + Dribbling + Curve + BallControl + Acceleration + SprintSpeed + Reactions + Stamina +Strength + Positioning + Vision + Penalties + Composure + Marking + StandingTackle  + SlidingTackle + Value2 + Weight2 + ReleaseClause2, data = TRAIN2)
+summary(overallNoGK)
+
+plot(overallNoGK$residuals ~ overallNoGK$fitted.values)
+abline(0,0)
+```
+
+
+```{r}
+
+
+
+fifaNoGK %>% mutate(predict.overall =predict(LM5, fifaNoGK)) %>%
+
+  ggplot()+geom_point(aes(x=Overall,y=predict.overall), color = "red", alpha=.2) + 
+
+  theme_minimal() + geom_abline(intercept=0,slope=1) +
+
+ xlab("Overall") +
+
+  ylab("Predicted Overall Under MODEL 2") + ggtitle("Predicted Overall Fitted on Test Data")
+
+
+
+fifaNoGK %>% mutate(predict.overall =predict(overallNoGK, fifaNoGK)) %>%
+
+  ggplot()+geom_point(aes(x=Overall,y=predict.overall), color = "red", alpha=.2) + 
+
+  theme_minimal() + geom_abline(intercept=0,slope=1) +
+
+ xlab("Overall") +
+
+  ylab("Predicted Overall Under MODEL 2") + ggtitle("Predicted Overall Fitted on Test Data")
+```
+
+
+
+```{r}
+fifaSmallNoGK = fifaNoGK %>% select(-c(X1, Nationality, Club, Jersey.Number, Preferred.Foot,  Body.Type, Position,  JoinDate2, Attack, Defense))
+
+
+
+
+```
+
+
+
+```{r}
+lm.model=lm(Value2~.,data=TRAIN2)
+glance(lm.model)
+param.est=lm.model$coefficients
+param.conf=confint(lm.model)
+param.lm=data.frame(cbind(param.est,param.conf))[-1,] #Remove Intercept
+names(param.lm)=c("Estimate","Lower","Upper")
+param.lm = param.lm %>%
+              mutate(Significant=factor(ifelse(0>Lower & 0<Upper,"No","Yes")))
+
+ggplot(param.lm[1:53,]) +
+  geom_pointrange(aes(x=1:53,y=Estimate,ymin=Lower,ymax=Upper,color=Significant),size=2)+
+  theme_minimal()+
+  scale_color_manual(drop=F,values=c("lightskyblue2","gray"))+
+  xlab("X1:X53")
+
+```
+
+
+```{r}
+fifaGK = fifa %>% filter(Position == "GK") %>% select(-c(Value, Wage, Weight, Name, Joined, Contract.Valid.Until,Release.Clause, Height, Unit, UnitRelease, UnitHeight, Inches, Work.Rate)) 
+
+
+set.seed(350)
+fifaGK$SPLIT = sample(x=c("TRAIN", "TEST"), size = 2025, replace = T, prob = c(.85, .15))
+
+TRAINGK = fifaGK %>% filter(SPLIT == "TRAIN")
+TESTGK = fifaGK %>% filter(SPLIT == "TEST")
+
+fifaSmallGK = fifaGK %>% select(-c(X1, Nationality, Club, Jersey.Number, Preferred.Foot,  Body.Type, Position,  JoinDate2, Attack, Defense, Position))
+
+TRAIN2GK = fifaSmallGK %>% filter(SPLIT=="TRAIN") %>% select(-c(SPLIT))
+TEST2GK = fifaSmallGK %>% filter(SPLIT== "TEST") %>%select(-c(SPLIT))
+
+```
+
+
+```{r}
+LM2GK = lm(Value2 ~ ., data = TRAIN2GK)
+summary(LM2GK)
+```
+
+```{r}
+LM3GK = lm(Value2 ~ Age + Potential + International.Reputation + Volleys + BallControl + Balance + ShotPower + Composure + GKReflexes + Wage2 + ReleaseClause2, data = TRAIN2GK)
+summary(LM3GK)
+
+valueGK = lm(Value2 ~ Age +  International.Reputation  + BallControl +  ShotPower + Composure + GKReflexes + Wage2 + ReleaseClause2, data = TRAIN2GK)
+summary(valueGK)
+```
+
+```{r}
+
+
+fifaSmallGK %>% mutate(predict.value = predict(LM3GK,fifaSmallGK)) %>%
+
+  ggplot()+geom_point(aes(x=Value2,y=predict.value,
+
+              color=factor(SPLIT,levels=c("TRAIN","TEST"))),alpha=0.2) + 
+
+  theme_minimal() + geom_abline(intercept=0,slope=1) +
+
+  guides(color=guide_legend(title="Dataset")) + xlab("Value") +
+
+  ylab("Predicted Value Under MODEL 2")
+
+
+fifaSmallGK %>% mutate(predict.value = predict(LM3GK,fifaSmallGK)) %>%
+
+  ggplot()+geom_point(aes(x=Value2,y=predict.value),color = "red", alpha=0.2) + 
+
+  theme_minimal() + geom_abline(intercept=0,slope=1) +
+
+
+  ylab("Predicted Value Under MODEL 2") + ggtitle("Predicted Value Fitted on Test Data")
+```
+```{r}
+fifaSmallGK %>% mutate(predict.value = predict(valueGK,fifaSmallGK)) %>%
+
+  ggplot()+geom_point(aes(x=Value2,y=predict.value,
+
+              color=factor(SPLIT,levels=c("TRAIN","TEST"))),alpha=0.2) + 
+
+  theme_minimal() + geom_abline(intercept=0,slope=1) +
+
+  guides(color=guide_legend(title="Dataset")) + xlab("Value") +
+
+  ylab("Predicted Value Under MODEL 2")
+
+
+fifaSmallGK %>% mutate(predict.value = predict(valueGK,fifaSmallGK)) %>%
+
+  ggplot()+geom_point(aes(x=Value2,y=predict.value),color = "red", alpha=0.2) + 
+
+  theme_minimal() + geom_abline(intercept=0,slope=1) +
+
+
+  ylab("Predicted Value Under MODEL 2") + ggtitle("Predicted Value Fitted on Test Data")
+```
+
+
+
+```{r}
+plot(LM3GK$residuals ~ LM3GK$fitted.values)
+abline(0,0)
+
+plot(valueGK$residuals ~ valueGK$fitted.values)
+abline(0,0)
+```
+
+
+
+```{r}
+LM4GK = lm(Overall ~ ., data = TRAIN2GK)
+summary(LM4GK)
+```
+```{r}
+LM5GK = lm(Overall ~International.Reputation + Reactions + ShotPower + Interceptions + GKDiving + GKHandling + GKKicking + GKPositioning + GKReflexes + Wage2, data = TRAIN2GK)
+summary(LM5GK)
+```
+
+
+```{r}
+LM6GK = lm(Overall ~International.Reputation + Reactions + ShotPower + GKDiving + GKHandling + GKKicking + GKPositioning + GKReflexes + Wage2, data = TRAIN2GK)
+summary(LM6GK)
+
+
+plot(LM6GK$residuals ~ LM6GK$fitted.values)
+abline(0,0)
+
+
+LM7GK = lm(Overall~GKDiving + GKHandling+GKKicking + GKPositioning + GKReflexes, data = TRAIN2GK)
+summary(LM7GK)
+
+plot(LM7GK$residuals ~ LM7GK$fitted.values)
+abline(0,0)
+```
+
+```{r}
+
+
+
+
+fifaSmallGK %>% mutate(predict.overall = predict(LM6GK, fifaSmallGK)) %>%
+
+  ggplot()+geom_point(aes(x=Overall,y=predict.overall,
+
+              color=factor(SPLIT,levels=c("TRAIN","TEST"))),alpha=0.2) + 
+
+  theme_minimal() + geom_abline(intercept=0,slope=1) +
+
+  guides(color=guide_legend(title="Dataset")) + xlab("Overall") +
+
+  ylab("Predicted Overall Under MODEL 2")
+
+
+
+
+
+fifaSmallGK %>% mutate(predict.overall = predict(LM7GK, fifaSmallGK)) %>%
+
+  ggplot()+geom_point(aes(x=Overall,y=predict.overall,
+
+              color=factor(SPLIT,levels=c("TRAIN","TEST"))),alpha=0.2) + 
+
+  theme_minimal() + geom_abline(intercept=0,slope=1) +
+
+  guides(color=guide_legend(title="Dataset")) + xlab("Overall") +
+
+  ylab("Predicted Overall Under MODEL 2")
+```
+```{r}
+fifaSmallGK %>% mutate(predict.overall = predict(LM6GK,fifaSmallGK)) %>%
+
+  ggplot()+geom_point(aes(x=Overall,y=predict.overall)) +
+theme_minimal() + geom_abline(intercept=0,slope=1) +
+
+   xlab("Overall") +
+
+  ylab("Predicted Overall Under MODEL 2") + ggtitle("Predicted Overall Fitted to Test Data")
+
+
+
+fifaSmallGK %>%mutate(predict.overall = predict(LM7GK,fifaSmallGK))  %>%
+
+  ggplot()+geom_point(aes(x=Overall,y=predict.overall)) +
+theme_minimal() + geom_abline(intercept=0,slope=1) +
+
+   xlab("Overall") +
+
+  ylab("Predicted Overall Under MODEL 2") + ggtitle("Predicted Overall Fitted to Test Data")
+```
+```{r}
+RMSE.func = function(actual,predict){
+mse=mean((actual-predict)^2,na.rm=T)
+rmse=sqrt(mse)
+return(rmse)
+}
+RMSE.func(actual=fifaSmallGK$Overall,
+predict=predict(LM6GK, fifaSmallGK))
+
+
+
+RMSE.func(actual=fifaSmallGK$Overall,
+predict=predict(LM7GK, fifaSmallGK))
+
+
+RMSE.func(actual=fifaSmallGK$Overall,
+predict=predict(LM5GK, fifaSmallGK))
+
+RMSE.func(actual=fifaSmallGK$Overall,
+predict=predict(LM4GK, fifaSmallGK))
+```

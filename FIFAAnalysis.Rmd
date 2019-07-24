@@ -1,6 +1,5 @@
 ---
-title: "Group Project"
-author: "Tyler Ward"
+title: "FIFA Project"
 date: "July 3, 2019"
 output: html_document
 ---

@@ -1,0 +1,168 @@
+---
+title: "Final Paper"
+author: "STOR 320.01 Group 5"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(tidyr)
+#Put Necessary Libraries Here
+library(knitr)
+library(kableExtra)
+library(readr)
+fifa <- read_csv("~/STOR 320/FinalFifa.csv")
+library(maps)
+library(dplyr)
+library(hexbin)
+library(broom)
+
+library(gridExtra)
+library(gtable)
+library(egg)
+library(modelr)
+
+```
+
+# INTRODUCTION
+
+  Soccer is the most popular sport in the world and FIFA is its equivalently popular video game counterpart, with fans to match. According to the game's publisher EA, FIFA has seen matches increase by fifteen percent year-over-year. This increase has largely been seen in Ultimate Team mode, where a player builds a team with professional soccer players. Game players want to collect the best soccer players to build their team and the ability to predict the best players based on certain characteristics can make this process more efficient and enjoyable. 
+
+  However, our modeling isn't just useful for the average video gamer, team owners can also benefit. A team owner needs to know specifically where to put their money so they can get the most from it. It is their responsibility to ensure that the team runs smoothly which requires two things: people to come watch the games and the team to win. We believe that the higher a professional player's Market Value, the more likely they are to have an interested fanbase. Additionally, a team is more likely to win if the players have a higher Overall skill level. This idea led us to our two questions. We decided to create models that would let us predict both of these attributes for a player given the data in the FIFA 19 dataset. 
+
+  We soon realized an important distinction needed to be made. Imagine watching a soccer game. Your attention is inevitably drawn towards two players: the person with the ball and the person at the end of the field in front of the goal. We recognized that there was a fundamental difference between goalkeepers and regular players and thus we split our predictive questions to include separate models for goalkeepers. We think this led to some insightful and unexpected results that we will share in this paper.
+
+
+
+# DATA
+
+  The data we used to answer our questions was taken from [Kaggle](https://www.kaggle.com/karangadiya/fifa19), but they extracted that data from the [FIFA database](https://www.fifaindex.com/players/fifa19/). This data was the most up to date information when the Kaggle dataset was created 7 months ago. Kaggle was able to extract 89 attributes for the 18,207 players in FIFA 19. 
+
+  The dataset we used had many variables to use for prediction. We used 38 variables in our best models to answer our questions. The following table contains each of the variables that we used in our final prediction models for each question (*Signifies variables that are not used in any of our final models).
+  
+```{r, echo=F}
+text_tbl <- tibble(
+  `Variable Names` = c("Age", "Overall", "Potential", "International Reputation", "Crossing", "Finishing", "Heading Accuracy", "Short Passing", "Volleys", "Long Passing", "Ball Control", "Reactions", "Stamina", "Vision", "Standing Tackle", "Wage", "Release Clause", "Acceleration", "Sprint Speed", "Agility", "Strength", "Positioning", "Penalties", "Composure", "Marking", "Sliding Tackle", "Value", "Weight", "Balance", "Attack", "Defense", "Preferred Foot", "Shot Power", "GKReflexes", "GKDiving", "GKHandling", "GKKicking", "GKPositioning", "Nationality*", "Club*", "Body Type*", "Position*", "Dribbling*", "Curve*", "Interceptions*", "Aggression*"),
+  `Variable Descriptions` = c("Age in Years", "Overall Rating from 1-100", "Potential of a Player from 1-100", "Reputation of Player from 1-5", " Rating from 1-100 of the Accuracy and Quality of a player's crosses (a medium- to-long-range pass from a wide area of the field towards the center of the field near the opponent's goal)", "Rating from 1-100 on a player's ability to score on an attacking attempt", "Rating from 1-100 that determines a player's accuracy when using the head to pass, shoot or clear the ball", "Rating from 1-100 that determines a player's accuracy for short passes", "Rating from 1-100 that determines a player's ability for performing volleys (a kick of the ball made before it touches the ground)", "Rating from 1-100 that determines a player's accuracy for long passes", "Rating from 1-100 that determines the ability of a player to control the ball on the field", "Rating from 1-100 that determines the acting speed of a player in response to the situations happening around them", "Rating from 1-100 that determines a player's ability to sustain prolonged physical or mental effort in a match", "Rating from 1-100 that determines a player's mental awareness about his teammates' positioning, for passing the ball to them", "Rating from 1-100 that determines the ability of performing a standing tackle of a player (effort to take the ball from an opponent by intercepting them while standing)", "Dollars per Week that a Player Makes", "If a team owns the rights to a player and another organization would like to negotiate with that player then they must pay the Release Clause, in dollars, amount to that team", "Rating from 1-100 that determines how fast a player can reach their maximum sprint speed", "Rating from 1-100 that determines the speed rate of a player's sprinting", "Rating from 1-100 that determines how quick and graceful a player is able to control the ball", "Rating from 1-100 that determines the quality or state of being physically strong of a player", "Rating from 1-100 that determines how well a player is able to perform the positioning (player's ability to place themselves in the right position to receive/catch the ball, score goals or do a tactical move) on the field as a player", "Rating from 1-100 that determines a player's accuracy for the shots taken from penalty kicks", "Rating from 1-100 that determines a player's state or feeling of being calm and controlling their frustration in matches", "Rating from 1-100 that determines a player's capability to mark (defensive strategy which aims to prevent a member of the opposing team, usually an attacker, from taking control of the ball) an opposition player or players to prevent them from taking control of the ball", "Rating from 1-100 that determines the ability of performing a sliding tackle of a player (effort to take the ball from an opponent by intercepting them while sliding)", "Value of a Player in Dollars", "Weight of a Player in Pounds", "Rating from 1-100 that determines the ability of a player to remain upright and steady when running, carrying and controlling the ball", "Rating of low, medium, or high that shows how a player participates in attacks", "Rating of low, medium, or high that shows how a player participates in defensive plays", "Preferred Foot of a Player", "Rating from 1-100 that determines the strength of a player's shooting", "Rating from 1-100 that determines a player's ability and speed to react for catching/saving the ball as a goalkeeper", "Rating from 1-100 that determines a player's ability to dive as a goalkeeper", "Rating from 1-100 that determines a player's ability to handle the ball and hold onto it using their hands as a goalkeeper", "Rating from 1-100 that determines a player's ability to kick the ball as a goalkeeper", "Rating from 1-100 that determines how well a player is able to perform the positioning (player's ability to place themselves in the right position to receive/catch the ball, score goals or do a tactical move) on the field as a goalkeeper", "Nation of Origin of a Player", "Name of the Club that a Player plays for", "Type of Body given to the player in the game", "Position that a Player Plays", "Rating from 1-100 that determines a player's ability to carry the ball", "Rating from 1-100 that determines a player's ability to curve the ball when passing and shooting", "Rating from 1-100 that determines a player's capability to intercept the ball", "Rating from 1-100 that determines the aggression level of a player")
+)
+
+kable(text_tbl) %>%
+  kable_styling(full_width = F) %>%
+  column_spec(1, bold = T, border_right = T) %>%
+  column_spec(2, width = "100em", background = "Ivory") %>% kable_styling() %>%
+  scroll_box(width = "1000px", height = "500px")
+
+```
+
+
+  We will predict value for goalkeepers and non-goalkeepers. We will also predict overall rating for goalkeepers and non-goalkeepers. Our original exploration of the data showed us that there was a clear difference in the average goalkeeper ratings when comparing non goal keepers and goal keepers of similar overall ratings. This led us to question if there was a difference in how to calculate overall and value for goalkeepers versus non-goalkeepers. The following plot shows the difference that we observed.
+  
+```{r, echo= F, warning=F}
+data<- fifa  %>% select(Overall ,GKDiving, GKHandling, GKKicking, GKPositioning, GKReflexes, Position) %>% mutate(GK = (Position == "GK"), Position = NULL, AvgGKSkill =(GKDiving+GKHandling+GKKicking+GKPositioning+GKReflexes)/5) %>% select(GK, Overall, AvgGKSkill) %>% filter(GK != "NA")
+ggplot(data, aes(x = AvgGKSkill, y= Overall, colour = GK))+geom_hex()+theme_minimal()
+```
+
+  The hex plot shows that, despite similarities in Overall rating, there exist stark differences between the GK skills of Goalkeepers and non-goalkeepers. This plot led to our decision to separate goalkeepers and non-goalkeepers, as it provides evidence that some predictors(i.e. goalkeeping skills) are significant for predicting goalkeepers Overall rating, but not significant for non-goalkeepers.
+
+# RESULTS
+
+  As we mentioned earlier, our approach of splitting our dataset into goalkeepers and non-goalkeepers required us to find four models that would answer our questions posed in the introduction. We will start first with our attempt to find a model that would predict a non-goalkeeping player's market value given several attributes from our dataset.
+
+  We initially fit a linear model to include all variables and predict market value. This was problematic for several reasons: our dataset included Nationality as one of the variables which had 164 distinct values. Similarly, there was a variable that had the Club each player played for. This amounted to a huge number of categorical variables that simply were not applicable to a large portion of the players. We then decided to try another linear model where Club, Nationality, Body Type, and Position were removed since they were prone to the issues just mentioned. This gave us a linear model with a RMSE of 618947.2. Using the lm function in the stats package of R we found that there were still variables included in our analysis that did not have significant p-values. We constructed another linear model including only the variables from the previous linear model that had p-values lower than 0.05. While this gave us a model with a RMSE of 618848.9, we noticed that one variable, Marking, that had a p-value higher than 0.05. We then made a fourth model excluding Marking which gave us a model with a RMSE of 618879.3. While this is slightly higher than the RMSE we got using our third model, we felt that the small increase did not warrant the inclusion of an additional variable. Speaking from a practical perspective it is better to have fewer variables in our model since that would equate to less time and money spent measuring said variables to predict the market value in a real-world context.
+  
+  Our final model to predict a player's market value included many variables we had expected such as Age, International Reputation, and Release Clause which fit in with the idea that a player's market value would be dependent on how popular they are and how highly their own team values them. The final model also included some unexpected variables, such as Crossing and Finishing, that had a less obvious relationship with market value.
+
+  
+```{r, echo=F, warning=F}
+fifaNoGK = fifa %>% filter(Position != "GK") %>% select(-c(GKDiving, GKHandling, GKKicking, GKPositioning, GKReflexes, Value, Wage, Weight, Name, Joined, Contract.Valid.Until,Release.Clause, Height, Unit, UnitRelease, UnitHeight, Inches, Work.Rate))
+set.seed(350)
+fifaNoGK$SPLIT = sample(x=c("TRAIN", "TEST"), size = 16122, replace = T, prob = c(.85, .15))
+
+TRAIN = fifaNoGK %>% filter(SPLIT == "TRAIN")
+TEST = fifaNoGK %>% filter(SPLIT == "TEST")
+TRAIN = TRAIN %>% select(-c( SPLIT, Club, Nationality)) #take out club and nationality out of the train set
+TRAIN2 = fifaNoGK %>% filter(SPLIT == "TRAIN") %>% select(-c(SPLIT))#train set with all valid variables included
+TRAIN3 = TRAIN %>% select(-c(Body.Type,Position))
+TEST2 = fifaNoGK %>% filter(SPLIT == "TEST") %>% select(-c(SPLIT))#test set with all valid variables included
+valueNoGK = lm(Value2~ Age + Overall + Potential + International.Reputation + Crossing + Finishing + HeadingAccuracy + ShortPassing + Volleys + LongPassing + BallControl + Reactions +  Stamina + Vision + StandingTackle + Wage2 + ReleaseClause2, data = TRAIN2)
+TEST2 %>% mutate(predict.value=predict(valueNoGK,TEST2)) %>%
+  ggplot()+geom_point(aes(x=Value2,y=predict.value), color = "red", alpha =.2)+theme_minimal()+geom_abline(intercept=0,slope=1)+xlab("Value")+ylab("Predicted Value")+ggtitle("Predicted Market Value for Non-Goalkeepers Fitted on Test Data")
+```
+
+  As you can see by the plot above titled, "Predicted Market Value for Non-Goalkeepers Fitted on Test-Data" our model works very well in predicting lower market values. As the market values increase however, our model becomes weaker. This can be attributed to the lower number of training observations we had that fit that criteria which makes sense since there are of course not as many Ronaldo's, Neymar's, and Messi's in the world as there are average players.
+  
+  Part two of our first question focused on finding a relationship that could allow us to predict the market value of goalkeepers. We conducted a similar method to what we mentioned above where our first model included all variables and from then on we modified our model to have smaller and smaller subsets of only significant variables. This process gave us three linear models with RMSE values of 315591.8, 314800.6, and 315202.8. Even though the third model has a slightly higher RMSE, we chose it due to the fact that it had the fewest predictors. That model omits Potential, Volleys, and Balance. Having fewer variables gives the third model a practical advantage. It is worth noting that the RMSE of our final model decreased as we refined it.
+
+  Our second question similarly required two models, one for non-goalkeepers and one for goalkeepers. Our method for predicting a non-goalkeeper player's Overall rating started off, again, with a linear regression model with all variables including Nationality, Club, Body.Type, and Position. We then took those out to create a second model resulting in a RMSE of 1.014164. Our next step was to include only those variables that were deemed significant and create a model with RMSE of 1.75724. The residual plot for that model indicated a possible logarithmic trend since our linear model overpredicted the Overall rating for individuals with a high rating. To potentially offset this change we took the log of the Overall rating thereby creating another model. This created the two residual plots shown below:
+  
+```{r, echo=F, warning =F}
+
+
+LM5 = lm(Overall ~ Age + Potential +  International.Reputation +  Finishing + HeadingAccuracy + ShortPassing + Dribbling + Curve + LongPassing + BallControl + Acceleration + SprintSpeed + Agility + Reactions + Stamina +Strength + Positioning + Vision + Penalties + Composure + Marking + StandingTackle  + SlidingTackle + Value2 + Weight2 + ReleaseClause2 + Balance + Crossing + Interceptions + Attack + Defense + Preferred.Foot + Aggression, data = TRAIN2)
+logLM5 = lm(log(Overall) ~ Age + Potential +  International.Reputation +  Finishing + HeadingAccuracy + ShortPassing + Dribbling + Curve + LongPassing + BallControl + Acceleration + SprintSpeed + Agility + Reactions + Stamina +Strength + Positioning + Vision + Penalties + Composure + Marking + StandingTackle  + SlidingTackle + Value2 + Weight2 + ReleaseClause2, data = TRAIN2)
+TEST2$residualsLM5 = TEST2$Overall - predict(LM5, TEST2)
+TEST2$residualslogLM5 =  TEST2$Overall - exp(predict(logLM5, TEST2))
+
+TEST2$fittedLM5 = predict(LM5, TEST2)
+TEST2$fittedlogLM5 = exp(predict(logLM5, TEST2))
+
+plog = ggplot() + geom_point(mapping = aes(x=TEST2$fittedlogLM5, y= TEST2$residualslogLM5), data = TEST2, alpha=.2, color = "navyblue") + geom_hline(yintercept=0, color="red") + theme_minimal() +ggtitle("Transformed") + xlab("Fitted Values") + ylab("Residuals")
+plm5= ggplot() + geom_point(mapping = aes(x=TEST2$fittedLM5, y= TEST2$residualsLM5), data = TEST2, alpha=.2, color = "navyblue") + geom_hline(yintercept=0, color="red") + theme_minimal() + ggtitle("Original") + xlab("Fitted Values") + ylab("Residuals")
+
+
+ggarrange(plm5, plog, ncol=2, widths=c(5,5))
+```
+  
+Unfortunately, this did not make a huge difference in the residual value distribution. Additionally, the RMSE even increased to 1.877294. Thus we decided to stick to our model third model for this iteration of the process. There was no obvious benefit to including logarithmic manipulation of our data. From the third model however, we did clean up the model slightly by dropping certain variables that were not significant after the initial drop; this included Dribbling, Curve, LongPassing, Interceptions, and Aggression. This was our final model to predict Overall rating for non-goalkeeper players and the associated RMSE was 1.756034. Again, although this was not the lowest RMSE, it made the most practical sense. To further prove that our model is accurate at predicting the Overall rating of a player, the following boxplot shows the distribution of actual overalls for players in our test data compared to what our prediction model says their overall should be.
+  
+```{r, echo=F}
+overallNoGK = lm(Overall ~ Age + Potential +  International.Reputation +  Finishing + HeadingAccuracy + ShortPassing + BallControl + Acceleration + SprintSpeed + Agility + Reactions + Stamina +Strength + Positioning + Vision + Penalties + Composure + Marking + StandingTackle  + SlidingTackle + Value2 + Weight2 + ReleaseClause2 + Balance + Crossing + Attack + Defense + Preferred.Foot, data = TRAIN2)
+TEST2$PredictOverall = predict(overallNoGK, TEST2)
+
+boxplot(TEST2$Overall, TEST2$PredictOverall, names=c("Actual Overall", "Predicted Overall"))
+
+```
+  
+  The boxplots have indistinguishable medians and IQRs, but the spread for the two models are slightly different. Our model seems very accurate, but tends to underrate the lowest tier players and overrate the highest tier players. This is something to be aware of when using our model for prediction. Our model does a great job of predicting the overall rating for the average player.
+  
+  The last model we created was to predict Overall rating for goalkeepers. This we decided to take in a slightly different direction based on what we discovered in our EDA. The hexplot we showed in the data section of this paper highlights a clear distinction between the values of all GK variables for goalkeepers and non-goalkeepers. Based on that premise, we thought it would be insightful to know if the model we created using the same principles as we did above would be superior to one based solely on the GK variables. The first model we created did not include the categorical variables we mentioned in the aforementioned models and produced a model with a RMSE of 0.3137396. We then improved the model to create a second by removing insignificant variables and illogical variables, in this case Interceptions. This did not make logical sense to include in a model that predicts for goalkeepers since they do not intercept the ball much. The model that was then created produced a RMSE of 0.3174126. We then compared that model to the one that only used GK variables, model three, which had an RMSE of 0.6802447. The figure shown below highlights the relationship between fitted values and actual values when predicting Overall rating for goalkeepers using model two (Final Model) and three (GK Statistics):
+
+  
+```{r, echo = F}
+fifaGK = fifa %>% filter(Position == "GK") %>% select(-c(Value, Wage, Weight, Name, Joined, Contract.Valid.Until, Release.Clause, Height, Unit, UnitRelease, UnitHeight, Preferred.Foot,Inches, Work.Rate))#filter dataset into just goalkeepers 
+set.seed(350)
+fifaGK$SPLIT = sample(x=c("TRAIN", "TEST"), size = 2025, replace = T, prob = c(.85, .15))
+TRAINGK = fifaGK %>% filter(SPLIT == "TRAIN") %>% select(-c(SPLIT,Position,Attack,Defense))#goalkeepers train including all variables some bad
+TESTGK = fifaGK %>% filter(SPLIT == "TEST")#goalkeepers test including all variables some bad
+fifaSmallGK = fifaGK %>% select(-c(X1,Nationality,Club,Jersey.Number,Body.Type,Position,JoinDate2,Attack,Defense)) #goalkeeper dataset minus bad categorical variables
+TRAIN2GK = fifaSmallGK %>% filter(SPLIT=="TRAIN") %>% select(-c(SPLIT))#split into train without categorical vars
+TEST2GK = fifaSmallGK %>% filter(SPLIT== "TEST") %>%select(-c(SPLIT))#split into test without categorical vars
+LM7GK = lm(Overall~GKDiving + GKHandling+GKKicking + GKPositioning + GKReflexes, data = TRAIN2GK)
+LM6GK = lm(Overall ~International.Reputation + Reactions + ShotPower + GKDiving + GKHandling + GKKicking + GKPositioning + GKReflexes + Wage2, data = TRAIN2GK)
+modelFinalOverallGK = TEST2GK %>% mutate(predict.overall = predict(LM6GK,TEST2GK)) %>%
+  ggplot()+geom_point(aes(x=Overall,y=predict.overall), color = "red")+theme_minimal() + geom_abline(intercept=0,slope=1)+xlab("Overall")+ylab("Predicted Overall") + ggtitle("Final Model Fitted on Test Data")
+GKStatsOverall= TEST2GK %>%mutate(predict.overall = predict(LM7GK,TEST2GK))  %>%
+  ggplot()+geom_point(aes(x=Overall,y=predict.overall), color = "red")+theme_minimal()+geom_abline(intercept=0,slope=1)+xlab("Overall")+ylab("Predicted Overall") + ggtitle("GK Statistics Fitted on Test Data")
+
+ggarrange(GKStatsOverall, modelFinalOverallGK, ncol=2, nrow=1)
+
+```
+  
+  It is evident that the model that does not solely include GK variables is better at predicting Overall rating. This was quite a revelation because it seems natural that the Overall rating of goalkeepers would depend mostly on their goalkeeping skills. Nevertheless, our analysis shows that variables such as International Reputation, Reactions, Shot Power, and Wage are equally as important as the GK variables. 
+
+
+
+#CONCLUSION
+
+  To find the answers on how to predict Market Value and Overall rating for goalkeepers and non-goalkeepers, we primarily used the backwards method of repeatedly removing insignificant variables from a larger model. We also explored transformations of the response variables. According to our analysis Market Value of non-goalkeeper players can be predicted based on Age, Overall, Potential, International Reputation, Crossing, Finishing, Heading Accuracy, Short Passing, Volleys, Long Passing, Ball Control, Reactions, Stamina, Vision, Standing Tackle, Wage, and Release Clause. Market Value of goalkeepers can be predicted based off of Age, International Reputation, Ball Control, Shot Power, Composure, GKReflexes, Wage, and Release Clause. Overall rating for non-goalkeepers can be predicted based on Age, Potential, International Reputation, Finishing, Heading Accuracy, Short Passing, Ball Control, Acceleration, Sprint Speed, Agility, Reactions, Stamina, Strength, Positioning, Vision, Penalties, Composure, Marking, Standing Tackle, Sliding Tackle, Value, Weight, Release Clause, Balance, Crossing, Attack, Defense Preferred Foot. Overall rating for goalkeepers can be predicted based on International Reputation, Reactions, Shot Power, GKDiving, GKHandling, GKKicking, GKPositioning, GKReflexes, and Wage. As we expected, the type of variables that predict the Market Value and Overall rating were different between goalkeepers and non-goalkeepers.
+
+  Our analysis can apply to the real world of professional soccer because Market Value can be a major factor in evaluating players and deciding on who signs in the future. Club soccer teams could utilize our models to predict the Market Value of certain players and use this in team-building and franchise-planning calculations. Similarly, Overall rating can be a very powerful tool for club owners who are building teams.
+
+  According to the model that predicts Overall rating, most of the significant predictors are related to the player's physical skills. We also found that the Overall rating of goalkeepers is significantly affected by goalkeeping skill ratings. Our findings can also be applied by real club teams to distinguish highly skilled players and low skilled players, with respect to goalkeepers and non-goalkeepers. On the other hand, FIFA users can reference our findings to help evaluate players and build better and more efficient online rosters.
+
+  Further analysis could be done on predicting Overall rating of players in every position, not just goalkeepers and non-goalkeepers. It seems likely that some of the more specific variables, like Marking or Shooting, would be significant in predicting Overall rating for only a few positions, such as Forwards and Strikers. We believe that more information could have been revealed if we had sufficient outstanding players; more Ronaldos and Mbappes. We could also combine our original data set with older sets of FIFA players, to account for any variance in the 2019 set or to examine trends over time. The addition of past datasets would also give us more low achieving and high achieving players. In the future, this data analysis could be used to predict professional soccer teams as well as online games such as Ultimate Football Management, Pro Evolution Soccer or even FIFA 20. 
+
+
+
